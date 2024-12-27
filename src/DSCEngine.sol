@@ -2,38 +2,115 @@
 
 pragma solidity ^0.8.0;
 
-/** 
-* @title DSCEngine
-* @author Vibhav Sharma
-* @dev This contract implements the minting and burning of the stablecoin
-*
-* The system is designed to be as minimal as possible, and have the tokens maitain a 1 token = 1 USD peg at all time.
-* This is a stablecoin with properties:
-* - Exogenously Collateralized
-* - Algorithmic Stable
-* - Soft peg to USD
-*
-* It is similar to DAI if DAI had no governance, no fees, and was backed by only WETH & WBTC.
+import {DecentalizedStableCoin} from "./DecentralizedStableCoin.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-* Our DSC system should alwalys be "overcollateralized". At no point, should the value of all 
-* collateral be less than the value of all DSC tokens in circulation.
-*
+/**
+ * @title DSCEngine
+ * @author Vibhav Sharma
+ * @dev This contract implements the minting and burning of the stablecoin
+ *
+ * The system is designed to be as minimal as possible, and have the tokens maitain a 1 token = 1 USD peg at all time.
+ * This is a stablecoin with properties:
+ * - Exogenously Collateralized
+ * - Algorithmic Stable
+ * - Soft peg to USD
+ *
+ * It is similar to DAI if DAI had no governance, no fees, and was backed by only WETH & WBTC.
+ *
+ * Our DSC system should alwalys be "overcollateralized". At no point, should the value of all
+ * collateral be less than the value of all DSC tokens in circulation.
+ *
  * @notice This contract is the core of the Decentralized Stablecoin system. It handles all the logic
  * for minting and redeeming DSC, as well as depositing and withdrawing collateral.
  * @notice This contract is based on the MakerDAO DSS system
-*
-*/
-contract DSCEngine {
+ *
+ */
+contract DSCEngine is ReentrancyGuard {
+    ///////////////////
+    //   Errors   //
+    ///////////////////
+    error DSCEngine__NeedsMoreThanZero();
+    error DSCEngine__TokenAddressAndPriceFeedLengthMismatch();
+    error DSCEngine__TokenNotSupported();
+    error DSCEngine__TransferFailed();
+
+    /////////////////////
+    // State Variables //
+    /////////////////////
+    mapping(address token => address priceFeed) private s_priceFeeds;
+    mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
+
+    DecentalizedStableCoin private immutable i_dsc;
+
+    ////////////////
+    // Events  //
+    ////////////////
+    event CollateralDeposited(address user, address indexed token, uint256 indexed amount);
+
+    ///////////////////
+    //   Modifiers   //
+    ///////////////////
+
+    /**
+     * @notice Ensures that the input value is greater than zero
+     * @param amount The amount to check
+     */
+    modifier moreThanZero(uint256 amount) {
+        if (amount == 0) {
+            revert DSCEngine__NeedsMoreThanZero();
+        }
+        _;
+    }
+
+    modifier isAllowedToken(address tokenAddress) {
+        if (s_priceFeeds[tokenAddress] == address(0)) {
+            revert DSCEngine__TokenNotSupported();
+        }
+        _;
+    }
+
     ///////////////////
     //   Functions   //
     ///////////////////
+
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedsAddress, address dscAddress) {
+        // USD Price Feeds
+        if (tokenAddresses.length != priceFeedsAddress.length) {
+            revert DSCEngine__TokenAddressAndPriceFeedLengthMismatch();
+        }
+        // For Example ETH/USD, BTC/USD, MKR/USd etc.
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            s_priceFeeds[tokenAddresses[i]] = priceFeedsAddress[i];
+        }
+        i_dsc = DecentalizedStableCoin(dscAddress);
+    }
 
     ///////////////////////////
     //   External Functions  //
     ///////////////////////////
     function depositCollaterAndMintDsc() external {}
 
-    function depositCollateral() external {}
+    /**
+     * @notice Deposits collateral into the contract
+     * @dev This function allows users to deposit a specified amount of collateral
+     * @param tokenCollateralAddress The address of the collateral token
+     * @param amountCollateral The amount of collateral to deposit
+     */
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        external
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
+        nonReentrant
+    {
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+    }
 
     function redeemCollateralForDsc() external {}
 
@@ -85,7 +162,6 @@ contract DSCEngine {
      * @dev Example Calculation: netProceeds = 40,000 USD - (40,000 USD * 0.05) = 38,000 USD
      *      The penalties are deducted to cover administrative costs or as deterrent against risky practices.
      */
-
     function liquidate() external {}
 
     function getHealthFactor() external view {}
