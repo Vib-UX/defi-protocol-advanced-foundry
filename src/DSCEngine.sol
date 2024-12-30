@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {DecentalizedStableCoin} from "./DecentralizedStableCoin.sol";
+import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
@@ -53,7 +53,7 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MINIMUM_HEALTH_FACTOR = 1;
 
-    DecentalizedStableCoin private immutable i_dsc;
+    DecentralizedStableCoin private immutable i_dsc;
 
     //////////////
     //  Events  //
@@ -96,7 +96,7 @@ contract DSCEngine is ReentrancyGuard {
             s_priceFeeds[tokenAddresses[i]] = priceFeedsAddress[i];
             s_collateralTokens.push(tokenAddresses[i]);
         }
-        i_dsc = DecentalizedStableCoin(dscAddress);
+        i_dsc = DecentralizedStableCoin(dscAddress);
     }
 
     ///////////////////////////

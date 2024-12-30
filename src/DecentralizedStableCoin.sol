@@ -20,12 +20,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * @notice This contract is part of the DeFi protocol advanced foundry project.
  *
  */
-contract DecentalizedStableCoin is ERC20Burnable, Ownable {
+contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     error DecentralizedStableCoin__MustBeGreaterThanZero();
-    error DecentralizedStableCoin__BurnAmountExceedsBalance(
-        uint256 balance,
-        uint256 amount
-    );
+    error DecentralizedStableCoin__BurnAmountExceedsBalance(uint256 balance, uint256 amount);
     error DecentralizedStableCoin__NotZeroAddress(address _address);
 
     constructor() ERC20("DecentalizedStableCoin", "DSC") Ownable(msg.sender) {}
@@ -36,18 +33,12 @@ contract DecentalizedStableCoin is ERC20Burnable, Ownable {
             revert DecentralizedStableCoin__MustBeGreaterThanZero();
         }
         if (balance < _amount) {
-            revert DecentralizedStableCoin__BurnAmountExceedsBalance(
-                balance,
-                _amount
-            );
+            revert DecentralizedStableCoin__BurnAmountExceedsBalance(balance, _amount);
         }
         super.burn(_amount);
     }
 
-    function mint(
-        address _to,
-        uint256 _amount
-    ) external onlyOwner returns (bool) {
+    function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
         if (_to == address(0)) {
             revert DecentralizedStableCoin__NotZeroAddress(_to);
         }
