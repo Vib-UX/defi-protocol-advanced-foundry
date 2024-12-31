@@ -59,6 +59,7 @@ contract DSCEngine is ReentrancyGuard {
     //  Events  //
     //////////////
     event CollateralDeposited(address user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address user, address indexed token, uint256 indexed amount);
 
     ///////////////////
     //   Modifiers   //
@@ -102,7 +103,20 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////////////
     //   External Functions  //
     ///////////////////////////
-    function depositCollaterAndMintDsc() external {}
+
+    /**
+     * @notice Deposits collateral and mints DSC (Decentralized Stable Coin) tokens.
+     * @dev This function allows users to deposit a specified amount of collateral and mint DSC tokens in return.
+     * @param tokenCollateral The address of the collateral token to be deposited.
+     * @param amountCollateral The amount of collateral to be deposited.
+     * @param amountDscToMint The amount of DSC tokens to be minted.
+     */
+    function depositCollaterAndMintDsc(address tokenCollateral, uint256 amountCollateral, uint256 amountDscToMint)
+        external
+    {
+        depositCollateral(tokenCollateral, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
 
     /**
      * @notice Deposits collateral into the contract
@@ -111,7 +125,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param amountCollateral The amount of collateral to deposit
      */
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
+        public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
@@ -124,9 +138,39 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralForDsc() external {}
+    /**
+     * @notice Redeems collateral and burns DSC (Decentralized Stable Coin) tokens.
+     * @dev This function allows users to redeem a specified amount of collateral and burn DSC tokens in return.
+     * @param tokenCollateral The address of the collateral token to be redeemed.
+     * @param amountCollateral The amount of collateral to be redeemed.
+     * @param amountDscToBurn The amount of DSC tokens to be burned.
+     */
+    function redeemCollateralForDsc(address tokenCollateral, uint256 amountCollateral, uint256 amountDscToBurn)
+        external
+    {
+        redeemCollateral(tokenCollateral, amountCollateral);
+        burnDsc(amountDscToBurn);
+    }
 
-    function redeemCollateral() external {}
+    /**
+     * @notice Redeems collateral from the contract
+     * @dev This function allows users to redeem a specified amount of collateral
+     * @param tokenCollateral The address of the collateral token
+     * @param amountCollateral The amount of collateral to redeem
+     */
+    function redeemCollateral(address tokenCollateral, uint256 amountCollateral)
+        public
+        moreThanZero(amountCollateral)
+        nonReentrant
+    {
+        s_collateralDeposited[msg.sender][tokenCollateral] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender, tokenCollateral, amountCollateral);
+        bool success = IERC20(tokenCollateral).transfer(msg.sender, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     /**
      * @notice Mints DSC (Decentralized Stable Coin) tokens to a specified address.
@@ -134,7 +178,7 @@ contract DSCEngine is ReentrancyGuard {
      *      Ensure that the caller has the necessary permissions to mint tokens..
      * @param amountDscToMint The number of DSC tokens to be minted.
      */
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
+    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         //
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -144,7 +188,20 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function burnDsc() external {}
+    /**
+     * @notice Burns DSC (Decentralized Stable Coin) tokens from a specified address.
+     * @dev This function allows the destruction of DSC tokens from the caller's address.
+     * @param amountDscToBurn The number of DSC tokens to be burned.
+     */
+    function burnDsc(uint256 amountDscToBurn) public moreThanZero(amountDscToBurn) nonReentrant {
+        s_DSCMinted[msg.sender] -= amountDscToBurn;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amountDscToBurn);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        i_dsc.burn(amountDscToBurn);
+        _revertIfHealthFactorIsBroken(msg.sender); // This is not required but lets keep it for now
+    }
 
     /**
      * @title Numeric Calculation Scenario for DSC Stablecoin Liquidation
