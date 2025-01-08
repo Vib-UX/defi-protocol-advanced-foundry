@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
@@ -20,7 +20,7 @@ contract DscEngineTest is Test {
 
     address USER = makeAddr("user");
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
-    uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
+    uint256 public constant STARTING_ERC20_BALANCE = 100 ether;
 
     function setUp() public {
         deployer = new DeployDSC();
@@ -62,8 +62,8 @@ contract DscEngineTest is Test {
         uint256 usdAmountInWei = 100 ether; //100e18
         // 1 eth = 2000 usd
         // 100 usd = 0.05 eth
-        uint256 actualValue = 0.05 ether;
-        uint256 expectedValue = engine.getTokenAmountFromUsd(weth, usdAmountInWei);
+        uint256 expectedValue = 0.05 ether;
+        uint256 actualValue = engine.getTokenAmountFromUsd(weth, usdAmountInWei);
         assertEq(actualValue, expectedValue);
     }
 
@@ -93,8 +93,10 @@ contract DscEngineTest is Test {
 
     function testCanDepositedCollateralAndGetAccountInfo() public depositedCollateral {
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = engine.getAccountInformation(USER);
+        // 10e18 * 2000e8 = 20,000e18
         uint256 expectedDepositedAmount = engine.getTokenAmountFromUsd(weth, collateralValueInUsd);
         assertEq(totalDscMinted, 0);
+        assertEq(collateralValueInUsd, 20_000e18);
         assertEq(expectedDepositedAmount, AMOUNT_COLLATERAL);
     }
 }
