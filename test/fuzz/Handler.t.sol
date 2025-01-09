@@ -1,0 +1,1 @@
+// Handler is going to narrow down the fuzzing scope to function calls
