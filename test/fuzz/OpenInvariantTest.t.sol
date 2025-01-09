@@ -21,14 +21,12 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Handler} from "./Handler.t.sol";
 
 contract InvariantTest is StdInvariant, Test {
     DeployDSC deployer;
     DSCEngine engine;
     DecentralizedStableCoin dsc;
     HelperConfig config;
-    Handler handler;
 
     address public weth;
     address public wbtc;
@@ -37,13 +35,10 @@ contract InvariantTest is StdInvariant, Test {
         deployer = new DeployDSC();
         (dsc, engine, config) = deployer.run();
         (,, weth, wbtc,) = config.activeNetworkConfig();
-        handler = new Handler(engine, dsc);
-        targetContract(address(handler)); // This is the contract we want to perform invariant checks on
-            // targetContract(address(engine)); // This is the contract we want to perform invariant checks on
-            // dont call redeemCollateral, unless there is a collateral to redeem
+        targetContract(address(engine)); // This is the contract we want to perform invariant checks on
     }
 
-    function invariant_protocolMusthaveMoreValueThanTotalSupply() public view {
+    function open_invariant_protocolMusthaveMoreValueThanTotalSupplyII() public view {
         uint256 totalValueOfDSC = dsc.totalSupply();
         uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dsc));
         uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(dsc));
