@@ -8,6 +8,7 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract DscEngineTest is Test {
     DecentralizedStableCoin dsc;
@@ -93,10 +94,55 @@ contract DscEngineTest is Test {
 
     function testCanDepositedCollateralAndGetAccountInfo() public depositedCollateral {
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = engine.getAccountInformation(USER);
-        // 10e18 * 2000e8 = 20,000e18
+        // 10e18 * 2000 = 20,000e18
         uint256 expectedDepositedAmount = engine.getTokenAmountFromUsd(weth, collateralValueInUsd);
         assertEq(totalDscMinted, 0);
         assertEq(collateralValueInUsd, 20_000e18);
         assertEq(expectedDepositedAmount, AMOUNT_COLLATERAL);
+    }
+
+    ///////////////////////////////////////
+    // depositCollateralAndMintDsc Tests //
+    ///////////////////////////////////////
+
+    // One way of testing not idle
+    function testRevertsIfMintedDscBreaksHealthFactor() public depositedCollateral {
+        // Breaking will happen due to undercollateralization
+        // First we should knowing liquidation threshold = 50 (200%) falling below this threshold will break the health factor
+        vm.prank(USER);
+        (, uint256 collateralValueInUsd) = engine.getAccountInformation(USER);
+
+        /*
+            healthFactor = 
+            (collateralValueInUsd * LiquidationThreshold / LiquidationPrecision) * 
+            Precision / totalDscMinted
+
+            healthFactor = 
+            (20_000e18 * 50 / 100) * 1e18 / totalDscMinted
+        */
+        uint256 expectedDscToBeMinted = collateralValueInUsd / 2;
+        console.log("Expected Dsc to be minted: ", expectedDscToBeMinted);
+        // Lets Try to mint some more Dsc for the user and break the health factor
+
+        uint256 wrongDscToBeMinted = expectedDscToBeMinted + 1e18;
+
+        // vm.expectRevert();
+        engine.mintDsc(expectedDscToBeMinted);
+    }
+
+    // Combine deposit and mint
+    function testRevertsIfMintedDscBreaksHealthFactorII() public {
+        (, int256 price,,,) = MockV3Aggregator(wethUsdPriceFeed).latestRoundData();
+        uint256 amountToMint =
+            (AMOUNT_COLLATERAL * uint256(price) * engine.getAdditionalFeedPrecision()) / engine.getPrecision();
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
+
+        uint256 expectedHealthFactor =
+            engine.calculateHealthFactor(amountToMint, engine.getUsdValue(weth, AMOUNT_COLLATERAL));
+
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
+        engine.depositCollaterAndMintDsc(weth, AMOUNT_COLLATERAL, amountToMint);
+        vm.stopPrank();
     }
 }
