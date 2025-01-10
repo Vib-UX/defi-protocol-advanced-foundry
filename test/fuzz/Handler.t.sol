@@ -14,6 +14,7 @@ contract Handler is Test {
     ERC20Mock weth;
     ERC20Mock wbtc;
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
+    address[] public userDepositedCollateral;
 
     constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
         engine = _dscEngine;
@@ -34,6 +35,28 @@ contract Handler is Test {
         ERC20Mock(collateral).approve(address(engine), amountCollateral);
 
         engine.depositCollateral(address(collateral), amountCollateral);
+        vm.stopPrank();
+        userDepositedCollateral.push(msg.sender);
+    }
+
+    function mintDsc(uint256 amount, uint256 seedUser) public {
+        if (userDepositedCollateral.length == 0) {
+            return;
+        }
+        address sender = userDepositedCollateral[seedUser % userDepositedCollateral.length];
+        // We would only want users to mint dsc based on the collateral they have provided
+        (uint256 totalDscMinted, uint256 totalCollateralInUsd) = engine.getAccountInformation(sender);
+        int256 maxDscToMint = (int256(totalCollateralInUsd) / 2) - int256(totalDscMinted);
+        if (maxDscToMint < 0) {
+            return;
+        }
+        amount = bound(amount, 0, uint256(maxDscToMint));
+        if (amount <= 0) {
+            return;
+        }
+
+        vm.startPrank(sender);
+        engine.mintDsc(amount);
         vm.stopPrank();
     }
 

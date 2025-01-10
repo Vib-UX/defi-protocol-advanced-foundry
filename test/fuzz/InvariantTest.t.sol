@@ -45,10 +45,14 @@ contract InvariantTest is StdInvariant, Test {
 
     function invariant_protocolMusthaveMoreValueThanTotalSupply() public view {
         uint256 totalValueOfDSC = dsc.totalSupply();
-        uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dsc));
-        uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(dsc));
+        uint256 totalWethDeposited = IERC20(weth).balanceOf(address(engine));
+        uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(engine));
         uint256 wethValue = engine.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = engine.getUsdValue(wbtc, totalWbtcDeposited);
+
+        console.log("Total Value of DSC: ", totalValueOfDSC);
+        console.log("Total Value of WETH: ", wethValue);
+        console.log("Total Value of WBTC: ", wbtcValue);
 
         assert(wethValue + wbtcValue >= totalValueOfDSC);
     }
