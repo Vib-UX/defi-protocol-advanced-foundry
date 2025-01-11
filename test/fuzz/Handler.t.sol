@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract Handler is Test {
     DSCEngine engine;
@@ -15,6 +16,7 @@ contract Handler is Test {
     ERC20Mock wbtc;
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
     address[] public userDepositedCollateral;
+    MockV3Aggregator public ethUsdPriceFeed;
 
     constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
         engine = _dscEngine;
@@ -23,6 +25,8 @@ contract Handler is Test {
         address[] memory collateralTokens = engine.getCollateralTokens();
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
+
+        ethUsdPriceFeed = MockV3Aggregator(engine.getCollateralTokenPriceFeed(address(weth)));
     }
 
     function depositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
@@ -58,6 +62,12 @@ contract Handler is Test {
         vm.startPrank(sender);
         engine.mintDsc(amount);
         vm.stopPrank();
+    }
+
+    // THIS BREAKS OUR INVARIANT TEST SUITE!!!
+    function updatePriceFeed(uint96 updatedPrice) public {
+        int256 newPrice = int256(uint256(updatedPrice));
+        ethUsdPriceFeed.updateAnswer(newPrice);
     }
 
     function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
